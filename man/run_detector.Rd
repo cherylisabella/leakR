@@ -21,12 +21,6 @@ run_detector(detector, data, split = NULL, id = NULL, config = list())
 A detector result object
 
 A detector result object
-
-A detector result object
-
-A detector result object
-
-A detector result object
 }
 \description{
 Run a detector on data

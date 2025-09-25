@@ -1,0 +1,220 @@
+---
+title: "Getting Started with leakr"
+author: "Cheryl Isabella Lim"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with leakr}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+```{r setup}
+library(leakr)
+```
+
+## Introduction
+
+Data leakage is one of the most insidious problems in machine learning, where information from the future or target variable inadvertently influences model training. The **leakr** package provides a comprehensive toolkit for detecting common leakage patterns that can compromise model validity and reproducibility.
+
+This vignette demonstrates the basic functionality of leakr using standard datasets, showing how to identify and diagnose potential leakage issues in your machine learning workflows.
+
+## Basic Usage: The leakr_audit() Function
+
+The primary interface for leakage detection is `leakr_audit()`, which runs multiple detectors on your dataset and generates a comprehensive report.
+
+### Simple Example with iris Dataset
+
+```{r basic_example}
+# Load the iris dataset
+data(iris)
+
+# Run a basic audit
+report <- leakr_audit(iris, target = "Species")
+
+# View the summary
+print(report)
+```
+
+### Understanding the Output
+
+The audit report contains several key components:
+
+- **Summary statistics** about your dataset
+- **Detected issues** organised by severity level
+- **Recommendations** for addressing potential leakage
+- **Diagnostic information** for each detector
+
+```{r examine_report}
+# Get a detailed summary
+summary_report <- leakr_summarise(report, top_n = 5, show_config = TRUE)
+print(summary_report)
+```
+
+## Working with Train/Test Splits
+
+One of the most common sources of leakage occurs when information from the test set influences training. Let's create a more realistic example:
+
+```{r train_test_example}
+# Create a dataset with potential train/test leakage
+set.seed(123)
+n <- 1000
+
+# Simulate a dataset
+data <- data.frame(
+  feature1 = rnorm(n),
+  feature2 = rnorm(n),
+  feature3 = rnorm(n),
+  target = factor(sample(c("A", "B"), n, replace = TRUE))
+)
+
+# Create a train/test split
+train_indices <- sample(1:n, 0.7 * n)
+split_vector <- rep("test", n)
+split_vector[train_indices] <- "train"
+
+# Run audit with split information
+report_with_split <- leakr_audit(
+  data = data,
+  target = "target",
+  split = split_vector
+)
+
+print(report_with_split)
+```
+
+## Detecting Specific Leakage Patterns
+
+### Target Leakage Detection
+
+Target leakage occurs when features contain information that would not be available at prediction time:
+
+```{r target_leakage}
+# Create data with obvious target leakage
+leaky_data <- data.frame(
+  legitimate_feature = rnorm(100),
+  target = factor(sample(c("yes", "no"), 100, replace = TRUE)),
+  stringsAsFactors = FALSE
+)
+
+# Add a leaky feature (perfectly correlated with target)
+leaky_data$leaky_feature <- ifelse(leaky_data$target == "yes", 1, 0)
+
+# Audit for target leakage
+leakage_report <- leakr_audit(leaky_data, target = "target")
+print(leakage_report)
+```
+
+### Duplication Detection
+
+Duplicate records can lead to optimistic performance estimates:
+
+```{r duplication}
+# Create data with duplicates
+original_data <- mtcars[1:20, ]
+duplicated_data <- rbind(original_data, original_data[1:5, ])
+
+# Add row identifiers
+duplicated_data$id <- 1:nrow(duplicated_data)
+
+# Run duplication audit
+dup_report <- leakr_audit(
+  data = duplicated_data, 
+  target = "mpg",
+  id = "id"
+)
+
+print(dup_report)
+```
+
+## Configuration and Customisation
+
+The `leakr_audit()` function accepts various configuration options to customise the detection process:
+
+```{r configuration}
+# Custom configuration
+custom_config <- list(
+  sample_size = 10000,        # Limit analysis to 10k rows for large datasets
+  correlation_threshold = 0.9, # Adjust sensitivity for correlation-based detectors
+  duplicate_threshold = 0.95   # Threshold for near-duplicate detection
+)
+
+# Run audit with custom configuration
+configured_report <- leakr_audit(
+  data = iris,
+  target = "Species",
+  config = custom_config
+)
+
+print(configured_report)
+```
+
+## Visualising Results
+
+Generate diagnostic plots to better understand detected issues:
+
+```{r visualisation, eval=FALSE}
+# Generate diagnostic plots
+plots <- generate_diagnostic_plots(report)
+
+# Display plots (if available)
+if (!is.null(plots)) {
+  plot(plots)
+}
+```
+
+## Working with Large Datasets
+
+For large datasets, leakr automatically applies intelligent sampling to maintain performance while preserving detection accuracy:
+
+```{r large_dataset_simulation}
+# Simulate a large dataset
+set.seed(42)
+large_n <- 50000
+
+large_data <- data.frame(
+  feature1 = rnorm(large_n),
+  feature2 = rnorm(large_n),
+  feature3 = sample(letters[1:5], large_n, replace = TRUE),
+  target = factor(sample(c("positive", "negative"), large_n, replace = TRUE))
+)
+
+# leakr will automatically sample this dataset
+large_report <- leakr_audit(large_data, target = "target")
+print(large_report)
+```
+
+## Next Steps
+
+This vignette covered the basics of using leakr for data leakage detection. For more advanced usage, including:
+
+- Integration with popular ML frameworks (caret, mlr3, tidymodels)
+- Custom detector development
+- Advanced configuration options
+- Handling specific data types and domains
+
+See the other vignettes in this package:
+
+- **Advanced Leakage Detection**: Deep dive into specific detector types and customisation
+- **Framework Integration**: Using leakr with caret, mlr3, and tidymodels workflows
+
+## Summary
+
+The leakr package provides a systematic approach to detecting data leakage in machine learning workflows. Key takeaways:
+
+1. Use `leakr_audit()` as your primary entry point for leakage detection
+2. Always specify your target variable and train/test splits when available
+3. Review the generated reports carefully and follow the recommendations
+4. Configure detection thresholds based on your specific use case
+5. Integrate leakage detection early in your ML pipeline to catch issues before they impact model performance
+
+Regular use of leakr can help ensure the integrity and reproducibility of your machine learning models.

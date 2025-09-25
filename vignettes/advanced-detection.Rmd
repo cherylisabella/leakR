@@ -1,0 +1,346 @@
+---
+title: "Advanced Leakage Detection with leakr"
+author: "Cheryl Isabella Lim"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Advanced Leakage Detection with leakr}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+```{r setup}
+library(leakr)
+```
+
+## Introduction
+
+This vignette explores advanced usage patterns for the leakr package, demonstrating how to detect subtle leakage patterns and customise the detection process for specific scenarios. We'll cover complex datasets, configuration options, and best practices for comprehensive leakage detection.
+
+## Understanding leakr's Detection Capabilities
+
+The leakr package can identify various types of data leakage that might compromise model validity:
+
+```{r detector_overview}
+# View available detectors
+available_detectors <- list_registered_detectors()
+print(available_detectors)
+```
+
+## Advanced Target Leakage Scenarios
+
+Target leakage can be subtle and context-dependent. Let's explore some realistic scenarios:
+
+### Medical Diagnosis Example
+
+```{r medical_example}
+# Create a medical dataset with subtle leakage
+set.seed(456)
+n <- 500
+
+medical_data <- data.frame(
+  patient_id = 1:n,
+  age = sample(25:75, n, replace = TRUE),
+  bmi = rnorm(n, 25, 4),
+  blood_pressure = rnorm(n, 120, 15),
+  diagnosis = factor(sample(c("healthy", "diseased"), n, replace = TRUE, prob = c(0.8, 0.2)))
+)
+
+# Add a leaky feature: treatment_received (only available post-diagnosis)
+medical_data$treatment_received <- ifelse(
+  medical_data$diagnosis == "diseased", 
+  sample(c("yes", "no"), sum(medical_data$diagnosis == "diseased"), replace = TRUE, prob = c(0.9, 0.1)),
+  "no"
+)
+
+# Audit the medical data
+medical_report <- leakr_audit(
+  data = medical_data,
+  target = "diagnosis",
+  id = "patient_id"
+)
+
+print(medical_report)
+```
+
+### Financial Data with Temporal Issues
+
+```{r financial_example}
+# Create financial data with temporal leakage
+set.seed(789)
+dates <- seq(as.Date("2020-01-01"), as.Date("2023-12-31"), by = "month")
+
+financial_data <- data.frame(
+  account_id = 1:200,
+  transaction_date = sample(dates, 200, replace = TRUE),
+  amount = rlnorm(200, 4, 1),
+  account_balance = rnorm(200, 1000, 500),
+  default_risk = factor(sample(c("low", "high"), 200, replace = TRUE))
+)
+
+# Sort by date
+financial_data <- financial_data[order(financial_data$transaction_date), ]
+
+# Add feature that uses future information (credit score after default assessment)
+financial_data$credit_score_updated <- ifelse(
+  financial_data$default_risk == "high",
+  rnorm(sum(financial_data$default_risk == "high"), 450, 50),
+  rnorm(sum(financial_data$default_risk == "low"), 750, 75)
+)
+
+# Create temporal split
+financial_data$split <- ifelse(
+  financial_data$transaction_date < as.Date("2022-01-01"), 
+  "train", 
+  "test"
+)
+
+# Audit financial data
+financial_report <- leakr_audit(
+  data = financial_data,
+  target = "default_risk",
+  split = "split",
+  id = "account_id"
+)
+
+print(financial_report)
+```
+
+## Advanced Duplication Detection
+
+### Near-Duplicate Detection in Customer Data
+
+```{r customer_duplicates}
+# Create customer dataset with near-duplicates
+set.seed(321)
+
+# Original customers
+customers <- data.frame(
+  name = c("John Smith", "Jane Doe", "Bob Johnson", "Alice Brown", "Charlie Davis"),
+  email = c("john@email.com", "jane@email.com", "bob@email.com", "alice@email.com", "charlie@email.com"),
+  age = c(35, 28, 42, 31, 39),
+  income = c(50000, 45000, 75000, 55000, 62000),
+  purchase_category = factor(c("electronics", "books", "clothing", "electronics", "books"))
+)
+
+# Create near-duplicates with slight variations
+near_dupes <- customers[1:3, ]
+near_dupes$name <- c("J Smith", "Jane D", "Robert Johnson")  # Name variations
+near_dupes$email <- c("john.smith@email.com", "j.doe@email.com", "bob.johnson@email.com")  # Email variations
+near_dupes$age <- near_dupes$age + c(1, 0, -1)  # Age variations
+
+# Combine datasets
+all_customers <- rbind(customers, near_dupes)
+all_customers$customer_id <- 1:nrow(all_customers)
+
+# Audit for duplicates
+dup_report <- leakr_audit(
+  data = all_customers,
+  target = "purchase_category",
+  id = "customer_id"
+)
+
+print(dup_report)
+```
+
+## Configuration and Customisation
+
+### Custom Configuration Options
+
+```{r configuration}
+# Example of custom configuration for sensitive detection
+sensitive_config <- list(
+  sample_size = 5000,           # Limit sample size for large datasets
+  correlation_threshold = 0.7,   # Lower threshold for correlation-based detection
+  duplicate_threshold = 0.9      # Threshold for considering records as duplicates
+)
+
+# Apply custom configuration
+iris_sensitive <- leakr_audit(
+  data = iris,
+  target = "Species",
+  config = sensitive_config
+)
+
+print(iris_sensitive)
+```
+
+## Working with Large Datasets
+
+### Stratified Sampling for Balanced Analysis
+
+```{r large_dataset}
+# Create a large imbalanced dataset
+set.seed(555)
+large_n <- 10000
+
+large_data <- data.frame(
+  feature1 = rnorm(large_n),
+  feature2 = sample(letters[1:10], large_n, replace = TRUE),
+  feature3 = rnorm(large_n, 100, 20),
+  # Imbalanced target
+  target = factor(sample(c("rare", "common"), large_n, replace = TRUE, prob = c(0.05, 0.95)))
+)
+
+# Use stratified sampling to ensure representation
+sample_indices <- stratified_sample(large_data$target, 1000)
+sampled_data <- large_data[sample_indices, ]
+
+# Verify sampling maintained class balance
+table(large_data$target)
+table(sampled_data$target)
+
+# Audit sampled data
+large_report <- leakr_audit(
+  data = sampled_data,
+  target = "target"
+)
+
+print(large_report)
+```
+
+## Advanced Reporting and Analysis
+
+### Detailed Report Analysis
+
+```{r detailed_analysis}
+# Create complex dataset for comprehensive analysis
+complex_data <- data.frame(
+  id = 1:300,
+  timestamp = seq(as.POSIXct("2023-01-01"), as.POSIXct("2023-12-31"), length.out = 300),
+  feature_a = rnorm(300),
+  feature_b = sample(LETTERS[1:5], 300, replace = TRUE),
+  feature_c = rnorm(300, 50, 10),
+  outcome = factor(sample(c("success", "failure"), 300, replace = TRUE))
+)
+
+# Add intentional leakage for demonstration
+complex_data$leaky_feature <- ifelse(complex_data$outcome == "success", 1, 0)
+
+# Generate comprehensive audit
+detailed_report <- leakr_audit(
+  data = complex_data,
+  target = "outcome",
+  id = "id"
+)
+
+# Generate detailed summary
+detailed_summary <- leakr_summarise(detailed_report, top_n = 10, show_config = TRUE)
+print(detailed_summary)
+```
+
+## Best Practices for Advanced Usage
+
+### 1. Multi-Stage Validation
+
+Implement a systematic approach to leakage detection:
+
+```{r multi_stage}
+# Multi-stage validation function
+comprehensive_validation <- function(data, target, id = NULL, split = NULL) {
+  
+  cat("Stage 1: Basic data validation\n")
+  # Basic preprocessing and validation
+  clean_data <- validate_and_preprocess_data(data, target, split, id)
+  
+  cat("Stage 2: Initial leakage screening\n")
+  # Quick initial screening
+  initial_report <- leakr_audit(clean_data, target = target, split = split, id = id)
+  
+  cat("Stage 3: Detailed analysis\n")
+  # Generate detailed summary
+  summary_report <- leakr_summarise(initial_report, top_n = 15, show_config = TRUE)
+  
+  # Count critical issues
+  if(length(initial_report$issues) > 0) {
+    critical_count <- sum(sapply(initial_report$issues, function(x) 
+      !is.null(x$severity) && x$severity == "high"))
+    
+    if(critical_count > 0) {
+      cat("WARNING:", critical_count, "critical issues detected!\n")
+    }
+  }
+  
+  return(list(
+    data = clean_data,
+    audit = initial_report,
+    summary = summary_report
+  ))
+}
+
+# Example usage
+# validation_result <- comprehensive_validation(your_data, "target_column")
+```
+
+### 2. Domain-Specific Validation
+
+Adapt validation to your specific domain:
+
+```{r domain_specific}
+# Example: E-commerce specific validation
+ecommerce_validation <- function(data, target) {
+  
+  # Standard audit
+  base_report <- leakr_audit(data, target = target)
+  
+  # Domain-specific checks
+  issues <- list()
+  
+  # Check for post-purchase features
+  post_purchase_patterns <- c("return", "refund", "satisfaction", "rating")
+  feature_names <- names(data)
+  
+  for(pattern in post_purchase_patterns) {
+    matching_features <- grep(pattern, feature_names, value = TRUE, ignore.case = TRUE)
+    if(length(matching_features) > 0) {
+      issues <- append(issues, paste("Potential post-purchase feature:", 
+                                   paste(matching_features, collapse = ", ")))
+    }
+  }
+  
+  if(length(issues) > 0) {
+    cat("Domain-specific warnings:\n")
+    for(issue in issues) {
+      cat("-", issue, "\n")
+    }
+  }
+  
+  return(base_report)
+}
+
+# Example e-commerce data
+ecommerce_data <- data.frame(
+  customer_id = 1:100,
+  purchase_amount = rlnorm(100, 4, 1),
+  product_category = sample(c("electronics", "books", "clothing"), 100, replace = TRUE),
+  customer_satisfaction = sample(1:5, 100, replace = TRUE),  # Post-purchase!
+  will_repurchase = factor(sample(c("yes", "no"), 100, replace = TRUE))
+)
+
+# Validate e-commerce data
+ecommerce_report <- ecommerce_validation(ecommerce_data, "will_repurchase")
+```
+
+## Summary
+
+This vignette has demonstrated advanced leakage detection techniques including:
+
+- **Complex leakage scenarios** in medical and financial domains
+- **Near-duplicate detection** for customer data
+- **Configuration customisation** for different sensitivity requirements
+- **Large dataset handling** with stratified sampling
+- **Multi-stage validation** workflows
+- **Domain-specific validation** approaches
+
+The key to effective leakage detection is understanding your data domain and systematically applying appropriate detection techniques. leakr provides the flexibility to adapt these techniques to your specific requirements whilst maintaining robust detection capabilities.
+
+For integration with popular ML frameworks, see the "Framework Integration" vignette.

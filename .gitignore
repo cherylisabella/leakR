@@ -6,6 +6,7 @@
 # RStudio files
 .Rproj.user/
 *.Rproj
+leakR.Rproj
 
 # Build/check artifacts
 .Rcheck/
@@ -25,3 +26,7 @@ Thumbs.db
 
 # Built docs
 inst/doc/
+doc/
+Meta/
+/doc/
+/Meta/

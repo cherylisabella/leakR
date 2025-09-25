@@ -1,0 +1,617 @@
+---
+title: "Framework Integration with leakr"
+author: "Cheryl Isabella Lim"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Framework Integration with leakr}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  eval = FALSE  # Set to TRUE when frameworks are available
+)
+```
+
+```{r setup}
+library(leakr)
+```
+
+## Introduction
+
+The leakr package integrates seamlessly with popular machine learning frameworks in R, allowing you to incorporate leakage detection directly into existing modelling workflows. This vignette demonstrates how to use leakr with **caret**, **mlr3**, and **tidymodels** frameworks.
+
+Integration functions automatically extract relevant information from trained models and preprocessing pipelines, making it easy to audit your complete machine learning workflow for potential data leakage issues.
+
+## Integration with caret
+
+The **caret** package is widely used for classification and regression training. leakr can analyse caret training objects to detect leakage in the underlying data and preprocessing steps.
+
+### Basic caret Integration
+
+```{r caret_basic}
+# Load required libraries
+library(caret)
+
+# Prepare iris data for caret
+data(iris)
+set.seed(123)
+
+# Create train/test split using caret
+train_index <- createDataPartition(iris$Species, p = 0.8, list = FALSE)
+train_data <- iris[train_index, ]
+test_data <- iris[-train_index, ]
+
+# Train a model using caret
+model_fit <- train(
+  Species ~ ., 
+  data = train_data, 
+  method = "rf",
+  trControl = trainControl(method = "cv", number = 5)
+)
+
+# Use leakr to audit the caret model
+caret_audit <- leakr_from_caret(
+  train_obj = model_fit,
+  original_data = iris,
+  target_name = "Species"
+)
+
+print(caret_audit)
+```
+
+### Advanced caret Integration with Preprocessing
+
+```{r caret_preprocessing}
+# Example with preprocessing steps that might introduce leakage
+set.seed(456)
+
+# Create a more complex dataset
+complex_data <- data.frame(
+  feature1 = rnorm(200),
+  feature2 = rnorm(200, 50, 10),
+  feature3 = sample(c("A", "B", "C"), 200, replace = TRUE),
+  target = factor(sample(c("positive", "negative"), 200, replace = TRUE))
+)
+
+# Add missing values to demonstrate preprocessing
+complex_data$feature1[sample(1:200, 20)] <- NA
+complex_data$feature2[sample(1:200, 15)] <- NA
+
+# Create train/test split
+train_idx <- createDataPartition(complex_data$target, p = 0.7, list = FALSE)
+train_complex <- complex_data[train_idx, ]
+test_complex <- complex_data[-train_idx, ]
+
+# Define preprocessing with potential leakage risks
+preprocess_recipe <- preProcess(
+  train_complex[, -4],  # Exclude target
+  method = c("center", "scale", "medianImpute")
+)
+
+# Train model with preprocessing
+model_complex <- train(
+  target ~ .,
+  data = train_complex,
+  method = "glm",
+  preProcess = c("center", "scale", "medianImpute"),
+  trControl = trainControl(method = "cv", number = 3)
+)
+
+# Audit the complex workflow
+complex_audit <- leakr_from_caret(
+  train_obj = model_complex,
+  original_data = complex_data,
+  target_name = "target"
+)
+
+# Generate detailed summary
+caret_summary <- leakr_summarise(complex_audit, show_config = TRUE)
+print(caret_summary)
+```
+
+## Integration with mlr3
+
+The **mlr3** ecosystem provides a modern, object-oriented approach to machine learning in R. leakr can extract information from mlr3 tasks and learners.
+
+### Basic mlr3 Integration
+
+```{r mlr3_basic}
+# Load mlr3 components
+library(mlr3)
+library(mlr3learners)
+
+# Create an mlr3 task
+iris_task <- TaskClassif$new(
+  id = "iris_classification",
+  backend = iris,
+  target = "Species"
+)
+
+# Use leakr to audit the mlr3 task
+mlr3_audit <- leakr_from_mlr3(
+  task = iris_task,
+  include_target = TRUE
+)
+
+print(mlr3_audit)
+```
+
+### Advanced mlr3 Integration with Pipelines
+
+```{r mlr3_advanced}
+library(mlr3pipelines)
+
+# Create a more complex dataset for demonstration
+titanic_like <- data.frame(
+  age = c(rnorm(100, 35, 10), rep(NA, 20)),
+  fare = c(rnorm(100, 50, 20), rep(NA, 20)),
+  sex = sample(c("male", "female"), 120, replace = TRUE),
+  class = sample(c("1st", "2nd", "3rd"), 120, replace = TRUE),
+  survived = factor(sample(c("yes", "no"), 120, replace = TRUE)),
+  stringsAsFactors = TRUE
+)
+
+# Create task
+survival_task <- TaskClassif$new(
+  id = "survival_prediction",
+  backend = titanic_like,
+  target = "survived"
+)
+
+# Create preprocessing pipeline that might introduce leakage
+preprocessing_pipeline <- po("imputehist") %>>%  # Imputation
+  po("scale") %>>%                               # Scaling
+  po("encode")                                   # Factor encoding
+
+# Create full pipeline with learner
+full_pipeline <- preprocessing_pipeline %>>%
+  po("learner", lrn("classif.rpart"))
+
+# Convert to learner
+pipeline_learner <- as_learner(full_pipeline)
+
+# Audit the mlr3 pipeline
+pipeline_audit <- leakr_from_mlr3(
+  task = survival_task,
+  include_target = TRUE
+)
+
+# Detailed analysis
+mlr3_summary <- leakr_summarise(pipeline_audit, top_n = 8)
+print(mlr3_summary)
+```
+
+## Integration with tidymodels
+
+The **tidymodels** framework provides a consistent approach to modelling in R. leakr can analyse workflows and recipes for potential leakage issues.
+
+### Basic tidymodels Integration
+
+```{r tidymodels_basic}
+# Load tidymodels components
+library(tidymodels)
+
+# Create initial split
+data(iris)
+set.seed(789)
+iris_split <- initial_split(iris, prop = 0.8, strata = Species)
+
+# Create recipe
+iris_recipe <- recipe(Species ~ ., data = training(iris_split)) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+# Create model specification
+iris_model <- rand_forest(mode = "classification") %>%
+  set_engine("ranger")
+
+# Create workflow
+iris_workflow <- workflow() %>%
+  add_recipe(iris_recipe) %>%
+  add_model(iris_model)
+
+# Use leakr to audit the tidymodels workflow
+tidymodels_audit <- leakr_from_tidymodels(
+  workflow = iris_workflow,
+  data = iris
+)
+
+print(tidymodels_audit)
+```
+
+### Advanced tidymodels Integration with Feature Engineering
+
+```{r tidymodels_advanced}
+# Create a dataset with potential feature engineering leakage
+set.seed(987)
+engineering_data <- data.frame(
+  customer_id = 1:300,
+  purchase_amount = rlnorm(300, 3, 1),
+  days_since_last = rpois(300, 30),
+  category = sample(c("electronics", "clothing", "books"), 300, replace = TRUE),
+  month = sample(1:12, 300, replace = TRUE),
+  will_return = factor(sample(c("yes", "no"), 300, replace = TRUE, prob = c(0.3, 0.7)))
+)
+
+# Add potential leakage: customer_lifetime_value (future information)
+engineering_data$customer_lifetime_value <- 
+  ifelse(engineering_data$will_return == "yes", 
+         engineering_data$purchase_amount * runif(300, 2, 5),
+         engineering_data$purchase_amount * runif(300, 0.5, 1.5))
+
+# Create data split
+engineering_split <- initial_split(engineering_data, prop = 0.8, strata = will_return)
+
+# Create comprehensive recipe with potential leakage sources
+engineering_recipe <- recipe(will_return ~ ., data = training(engineering_split)) %>%
+  update_role(customer_id, new_role = "ID") %>%
+  step_log(purchase_amount, customer_lifetime_value) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(terms = ~ purchase_amount:days_since_last) %>%
+  step_pca(all_numeric_predictors(), num_comp = 5)
+
+# Create model specification
+engineering_model <- logistic_reg() %>%
+  set_engine("glm")
+
+# Create workflow
+engineering_workflow <- workflow() %>%
+  add_recipe(engineering_recipe) %>%
+  add_model(engineering_model)
+
+# Audit the complex tidymodels workflow
+complex_tidymodels_audit <- leakr_from_tidymodels(
+  workflow = engineering_workflow,
+  data = engineering_data
+)
+
+# Generate detailed summary
+tidymodels_summary <- leakr_summarise(
+  complex_tidymodels_audit, 
+  top_n = 10, 
+  show_config = TRUE
+)
+
+print(tidymodels_summary)
+```
+
+## Data Import and Export Integration
+
+leakr provides seamless integration with data import/export operations, allowing you to audit data as part of your data pipeline:
+
+### Import with Automatic Auditing
+
+```{r import_integration}
+# Import data with automatic leakage checking
+# This would typically be used with real files
+example_data <- data.frame(
+  id = 1:100,
+  feature1 = rnorm(100),
+  feature2 = sample(letters[1:5], 100, replace = TRUE),
+  target = factor(sample(c("A", "B"), 100, replace = TRUE))
+)
+
+# Simulate importing and auditing in one step
+imported_audit <- leakr_audit(
+  data = example_data,
+  target = "target",
+  id = "id"
+)
+
+# Quick import function (simulated)
+leakr_quick_audit <- function(data_path, target, ...) {
+  # In practice, this would use leakr_import() followed by leakr_audit()
+  # data <- leakr_import(data_path, ...)
+  # audit <- leakr_audit(data, target = target)
+  # return(list(data = data, audit = audit))
+  
+  # For demonstration
+  return(imported_audit)
+}
+```
+
+### Export with Audit Reports
+
+```{r export_integration}
+# Export data along with audit reports
+export_config <- list(
+  include_audit_report = TRUE,
+  format = "comprehensive",
+  generate_summary = TRUE
+)
+
+# This would export both data and audit results
+# leakr_export_data(
+#   data = example_data,
+#   file_path = "audited_dataset",
+#   audit_report = imported_audit,
+#   config = export_config
+# )
+```
+
+## Snapshot and Version Control Integration
+
+leakr supports data versioning and snapshot functionality for tracking changes in leakage patterns over time:
+
+### Creating Data Snapshots
+
+```{r snapshots}
+# Create snapshot of current data state
+snapshot_info <- leakr_create_snapshot(
+  data = example_data,
+  name = "baseline_data",
+  metadata = list(
+    created_by = "data_scientist",
+    purpose = "baseline_analysis",
+    version = "1.0"
+  )
+)
+
+# List available snapshots
+available_snapshots <- leakr_list_snapshots()
+print(available_snapshots)
+
+# Load previous snapshot for comparison
+# previous_data <- leakr_load_snapshot("baseline_data")
+```
+
+## Workflow Integration Patterns
+
+### Pattern 1: Pre-Training Validation
+
+```{r pre_training}
+# Complete pre-training validation workflow
+validate_before_training <- function(data, target, test_split = 0.2) {
+  # Step 1: Basic data validation
+  validated_data <- validate_and_preprocess_data(
+    data = data,
+    target = target,
+    split = NULL,
+    id = NULL,
+    config = list(remove_empty_cols = TRUE)
+  )
+  
+  # Step 2: Create train/test split
+  set.seed(42)
+  n <- nrow(validated_data)
+  train_indices <- sample(1:n, (1 - test_split) * n)
+  split_vector <- rep("test", n)
+  split_vector[train_indices] <- "train"
+  
+  # Step 3: Comprehensive leakage audit
+  audit_report <- leakr_audit(
+    data = validated_data,
+    target = target,
+    split = split_vector
+  )
+  
+  # Step 4: Check for blocking issues
+  critical_issues <- length(audit_report$issues[
+    sapply(audit_report$issues, function(x) x$severity == "high")
+  ])
+  
+  if (critical_issues > 0) {
+    warning(paste("Found", critical_issues, "critical issues. Review before training."))
+  }
+  
+  return(list(
+    data = validated_data,
+    split = split_vector,
+    audit = audit_report,
+    safe_to_train = critical_issues == 0
+  ))
+}
+
+# Example usage
+# validation_result <- validate_before_training(your_data, "target_column")
+# if (validation_result$safe_to_train) {
+#   # Proceed with model training
+# }
+```
+
+### Pattern 2: Post-Training Audit
+
+```{r post_training}
+# Post-training comprehensive audit
+post_training_audit <- function(model_object, framework = "caret") {
+  
+  audit_result <- switch(framework,
+    "caret" = leakr_from_caret(model_object),
+    "mlr3" = leakr_from_mlr3(model_object),
+    "tidymodels" = leakr_from_tidymodels(model_object),
+    stop("Unsupported framework")
+  )
+  
+  # Generate comprehensive summary
+  summary_report <- leakr_summarise(
+    audit_result,
+    top_n = 15,
+    show_config = TRUE
+  )
+  
+  return(list(
+    audit = audit_result,
+    summary = summary_report
+  ))
+}
+```
+
+### Pattern 3: Continuous Monitoring
+
+```{r continuous_monitoring}
+# Set up continuous monitoring for production data
+setup_leakage_monitoring <- function(data_source, target, schedule = "daily") {
+  
+  monitor_config <- list(
+    alert_threshold = "medium",  # Alert on medium+ severity issues
+    notification_email = "data-team@company.com",
+    generate_plots = TRUE,
+    archive_reports = TRUE
+  )
+  
+  # This would typically integrate with a scheduler like cron
+  monitoring_function <- function() {
+    # Load current data
+    current_data <- data_source()  # Function to fetch current data
+    
+    # Run audit
+    current_audit <- leakr_audit(
+      data = current_data,
+      target = target,
+      config = monitor_config
+    )
+    
+    # Check for issues requiring attention
+    medium_high_issues <- length(current_audit$issues[
+      sapply(current_audit$issues, function(x) x$severity %in% c("medium", "high"))
+    ])
+    
+    if (medium_high_issues > 0) {
+      # Send alert (implementation would depend on your notification system)
+      message(paste("Leakage monitoring alert:", medium_high_issues, "issues detected"))
+    }
+    
+    # Archive report with timestamp
+    timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
+    # save(current_audit, file = paste0("audit_", timestamp, ".RData"))
+    
+    return(current_audit)
+  }
+  
+  return(monitoring_function)
+}
+
+# Example setup
+# monitor <- setup_leakage_monitoring(
+#   data_source = function() { read.csv("daily_data.csv") },
+#   target = "outcome"
+# )
+# daily_audit <- monitor()
+```
+
+## Performance Considerations
+
+### Memory-Efficient Processing
+
+```{r memory_efficient}
+# Configuration for large-scale processing
+large_scale_config <- list(
+  sample_size = 10000,           # Limit memory usage
+  chunk_processing = TRUE,        # Process in chunks
+  parallel_detectors = FALSE,     # Disable if memory constrained
+  save_intermediate = TRUE,       # Save intermediate results
+  cleanup_temp = TRUE            # Clean up temporary objects
+)
+
+# Process very large dataset efficiently
+process_large_dataset <- function(data_path, target, config = large_scale_config) {
+  
+  # Process in chunks if dataset is too large to fit in memory
+  if (file.size(data_path) > 1e9) {  # > 1GB
+    # Implement chunked processing
+    message("Large dataset detected, using chunked processing")
+    
+    # This would implement actual chunked reading and processing
+    # chunk_results <- process_in_chunks(data_path, target, config)
+    # combined_audit <- combine_audit_results(chunk_results)
+    # return(combined_audit)
+  } else {
+    # Standard processing for manageable datasets
+    data <- read.csv(data_path)
+    return(leakr_audit(data, target = target, config = config))
+  }
+}
+```
+
+## Best Practices for Framework Integration
+
+### 1. Integration Timing
+
+- **Pre-training**: Audit raw data before any preprocessing
+- **Post-preprocessing**: Check for leakage introduced by feature engineering
+- **Post-training**: Validate that model training didn't expose leakage patterns
+- **Production**: Monitor for data drift and emerging leakage patterns
+
+### 2. Configuration Management
+
+```{r config_management}
+# Create environment-specific configurations
+development_config <- list(
+  sample_size = 1000,
+  generate_plots = TRUE,
+  detailed_logging = TRUE
+)
+
+production_config <- list(
+  sample_size = 10000,
+  generate_plots = FALSE,
+  detailed_logging = FALSE,
+  alert_on_issues = TRUE
+)
+
+testing_config <- list(
+  sample_size = 500,
+  run_all_detectors = TRUE,
+  strict_thresholds = TRUE
+)
+```
+
+### 3. Error Handling and Logging
+
+```{r error_handling}
+# Robust error handling for production environments
+safe_audit <- function(data, target, ...) {
+  tryCatch({
+    audit_result <- leakr_audit(data, target = target, ...)
+    
+    # Log successful audit
+    message(paste("Audit completed successfully at", Sys.time()))
+    
+    return(list(
+      success = TRUE,
+      audit = audit_result,
+      timestamp = Sys.time()
+    ))
+    
+  }, error = function(e) {
+    # Log error details
+    error_msg <- paste("Audit failed:", e$message)
+    warning(error_msg)
+    
+    return(list(
+      success = FALSE,
+      error = error_msg,
+      timestamp = Sys.time()
+    ))
+  })
+}
+```
+
+## Summary
+
+This vignette has demonstrated comprehensive integration patterns for using leakr with major R machine learning frameworks:
+
+- **caret integration**: Extracting and auditing training objects and preprocessing pipelines
+- **mlr3 integration**: Working with tasks, learners, and complex pipelines  
+- **tidymodels integration**: Analysing workflows and recipes for leakage patterns
+- **Data pipeline integration**: Import/export workflows with built-in auditing
+- **Monitoring and versioning**: Snapshot management and continuous monitoring
+- **Production patterns**: Memory-efficient processing and robust error handling
+
+Key integration principles:
+
+1. **Early detection**: Integrate leakage detection early in your workflow
+2. **Comprehensive coverage**: Audit both data and preprocessing steps
+3. **Framework consistency**: Use framework-specific integration functions when available
+4. **Monitoring mindset**: Set up continuous monitoring for production systems
+5. **Configuration management**: Adapt detection sensitivity to your environment
+
+By following these patterns, you can ensure that leakage detection becomes a natural and reliable part of your machine learning workflows, helping maintain model integrity and reproducibility across different frameworks and environments.

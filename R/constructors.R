@@ -21,6 +21,7 @@ new_temporal_detector <- function(time_col, lookahead_window = 1) {
     class = c("temporal_detector", "detector")
   )
 }
+
 #' @title Create a new train-test detector
 #' @return A train_test_detector object
 #' @export
@@ -47,34 +48,7 @@ new_train_test_detector <- function(threshold = 0.1) {
 #' @param split Split vector indicating train/test assignment (optional)
 #' @param id Optional ID column name
 #' @param config Optional configuration list
-#'
-#' Run a detector on data
-#' @return A detector result object
-#' @export
-#' @param detector A detector object
-#' @param data Data frame to analyze
-#' @param split Split vector indicating train/test assignment (optional)
-#' @param id Optional ID column name
-#' @param config Optional configuration list
-#'
-#' Run a detector on data
-#' @return A detector result object
-#' @export
-#' @param detector A detector object
-#' @param data Data frame to analyze
-#' @param split Split vector indicating train/test assignment (optional)
-#' @param id Optional ID column name
-#' @param config Optional configuration list
-#'
-#' Run a detector on data
-#' @return A detector result object
-#' @export
-#' @param detector A detector object
-#' @param data Data frame to analyze
-#' @param split Split vector indicating train/test assignment (optional)
-#' @param id Optional ID column name
-#' @param config Optional configuration list
-#'
+
 #' @title Run a detector on data
 #' @return A detector result object
 #' @export
