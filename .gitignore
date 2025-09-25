@@ -1,5 +1,27 @@
+# R session files
 .Rhistory
 .RData
+.Ruserdata
+
+# RStudio files
 .Rproj.user/
-.DS_Store
+*.Rproj
+
+# Build/check artifacts
+.Rcheck/
 *.tar.gz
+*.Rcheck/
+
+# Temporary or backup
+*~
+*.bak
+*.swp
+.Rbackups/
+R_backup/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Built docs
+inst/doc/

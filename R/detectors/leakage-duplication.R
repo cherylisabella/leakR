@@ -76,7 +76,7 @@ detect_duplication <- function(audit_data, config) {
   return(create_detector_result(issues, evidence))
 }
 
-#' Detect exact duplicate rows using cryptographic hashing
+#' @title Detect exact duplicate rows using cryptographic hashing
 #'
 #' @param data Dataset to analyse
 #' @param config Configuration parameters
@@ -144,7 +144,8 @@ detect_exact_duplicates <- function(data, config) {
   return(list(issues = issues, evidence = evidence))
 }
 
-#' Determine duplication severity
+#' @title Determine duplication severity
+#'
 #' @keywords internal
 determine_duplication_severity <- function(duplication_rate, n_groups) {
   if (duplication_rate > 0.1 || n_groups > 50) {
@@ -158,7 +159,7 @@ determine_duplication_severity <- function(duplication_rate, n_groups) {
   }
 }
 
-#' Detect near-duplicate rows using similarity measures
+#' @title Detect near-duplicate rows using similarity measures
 #'
 #' @param data Dataset to analyse
 #' @param numeric_features Names of numeric features
@@ -229,7 +230,8 @@ detect_near_duplicates <- function(data, numeric_features, categorical_features,
   return(list(issues = issues, evidence = evidence))
 }
 
-#' Calculate pairwise similarity between rows
+#' @title Calculate pairwise similarity between rows
+#'
 #' @keywords internal
 calculate_pairwise_similarity <- function(data, numeric_features, categorical_features, threshold) {
 
@@ -289,7 +291,8 @@ calculate_pairwise_similarity <- function(data, numeric_features, categorical_fe
   )
 }
 
-#' Calculate similarity between two specific rows
+#' @title Calculate similarity between two specific rows
+#'
 #' @keywords internal
 calculate_row_similarity <- function(i, j, numeric_data, categorical_data) {
 
@@ -352,7 +355,8 @@ calculate_row_similarity <- function(i, j, numeric_data, categorical_data) {
   }
 }
 
-#' Cluster similar pairs into groups
+#' @title Cluster similar pairs into groups
+#'
 #' @keywords internal
 cluster_similar_pairs <- function(similar_pairs, n_rows) {
 
@@ -405,7 +409,7 @@ cluster_similar_pairs <- function(similar_pairs, n_rows) {
   clusters
 }
 
-#' Detect ID-based duplicates
+#' @title Detect ID-based duplicates
 #'
 #' @param data Dataset
 #' @param id_col ID column name
@@ -473,7 +477,7 @@ detect_id_duplicates <- function(data, id_col, config) {
   return(list(issues = issues, evidence = evidence))
 }
 
-#' Detect subset duplicates (rows that are subsets of other rows)
+#' @title Detect subset duplicates (rows that are subsets of other rows)
 #'
 #' @param data Dataset
 #' @param config Configuration parameters
@@ -522,7 +526,8 @@ detect_subset_duplicates <- function(data, config) {
   return(list(issues = issues, evidence = evidence))
 }
 
-#' Find subset relationships between rows
+#' @title Find subset relationships between rows
+#'
 #' @keywords internal
 find_subset_relationships <- function(data) {
 
@@ -553,7 +558,8 @@ find_subset_relationships <- function(data) {
   relationships
 }
 
-#' Check if row1 is a subset of row2
+#' @title Check if row1 is a subset of row2
+#'
 #' @keywords internal
 is_subset_row <- function(row1, row2) {
 
@@ -587,7 +593,7 @@ is_subset_row <- function(row1, row2) {
   all(matches)
 }
 
-#' Detect cluster-based duplicates using unsupervised clustering
+#' @title Detect cluster-based duplicates using unsupervised clustering
 #'
 #' @param data Dataset
 #' @param numeric_features Numeric feature names
@@ -664,7 +670,8 @@ detect_cluster_based_duplicates <- function(data, numeric_features, config) {
   return(list(issues = issues, evidence = evidence))
 }
 
-#' Perform clustering for duplicate detection
+#' @title Perform clustering for duplicate detection
+#'
 #' @keywords internal
 perform_duplicate_clustering <- function(scaled_data, config) {
 
@@ -712,7 +719,7 @@ perform_duplicate_clustering <- function(scaled_data, config) {
   )
 }
 
-#' Analyse clusters for duplicate patterns
+#' @title Analyse clusters for duplicate patterns
 #' @keywords internal
 analyse_cluster_duplicates <- function(cluster_result, original_data, config) {
 
@@ -748,7 +755,7 @@ analyse_cluster_duplicates <- function(cluster_result, original_data, config) {
   list(suspicious_clusters = suspicious_clusters)
 }
 
-#' Calculate average within-cluster similarity
+#' @title Calculate average within-cluster similarity
 #' @keywords internal
 calculate_cluster_similarity <- function(cluster_data) {
 
@@ -794,8 +801,5 @@ calculate_cluster_similarity <- function(cluster_data) {
   }
 }
 
-#' Null-coalescing operator
+#' @title Null-coalescing operator
 #' @keywords internal
-`%||%` <- function(x, y) {
-  if (is.null(x)) y else x
-}

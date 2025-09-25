@@ -5,13 +5,10 @@ Version: 0.1.0
 Authors@R: person("Cheryl Isabella", "Lim", email = "cheryl.academic@gmail.com", role = c("aut", "cre"))
 Description: Provides utilities to detect common data leakage patterns including train/test contamination, temporal leakage, and data duplication,
   enhancing model reliability and reproducibility in machine learning workflows. Generates diagnostic reports and visual summaries to support data validation.
-Imports:
-    ggplot2,
-    jsonlite
-Suggests:
-    testthat (>= 3.0.0)
-License: MIT
+Imports: ggplot2, arrow, data.table, digest, htmltools, openxlsx, readxl, stringr, workflows, jsonlite
+Suggests: testthat (>= 3.0.0), caret, mlr3, tidymodels
+License: GPL-3 + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 LazyData: false
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3

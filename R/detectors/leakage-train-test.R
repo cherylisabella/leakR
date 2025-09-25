@@ -80,10 +80,4 @@ run_detector.train_test_detector <- function(detector, data, target = NULL, spli
   detect_train_test_contamination(data, split, id, config)
 }
 
-#' Register this detector in the detector registry system
-register_detector(
-  "train_test_contamination",
-  detect_train_test_contamination,
-  "Detects overlap and distributional differences between train/test sets"
-)
 

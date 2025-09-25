@@ -1,35 +1,35 @@
 #' @title Import data from various sources for leakage analysis
-#'
-#' @description Flexible data import function supporting multiple formats with automatic
-#' format detection and preprocessing for leakage analysis.
-#'
-#' @param source Path to data file, data.frame, or other supported object
-#' @param format Data format: "auto", "csv", "excel", "rds", "json", "parquet"
-#' @param preprocessing List of preprocessing options
-#' @param encoding Character encoding for text files
-#' @param sheet Sheet name/number for Excel files
-#' @param verbose Whether to show import messages
-#' @param ... Additional arguments passed to format-specific readers
+#' @description Flexible data import function supporting multiple formats with automatic format detection and preprocessing for leakage analysis.
 #'
 #' @return Standardised data.frame suitable for leakage analysis
 #' @export
 #'
 #' @examples
 #' \dontrun{
-#' # Auto-detect CSV format
 #' data <- leakr_import("data.csv")
-#'
-#' # Import Excel with preprocessing
 #' data <- leakr_import("data.xlsx", sheet = "raw_data",
-#'                     preprocessing = list(remove_empty_cols = TRUE))
-#'
-#' # Import with custom options
-#' @keywords internal
+#'   preprocessing = list(remove_empty_cols = TRUE))
 #' data <- leakr_import("data.csv", format = "csv", encoding = "UTF-8")
 #' }
+#' @param source Path to data file, data.frame, or other supported object
+#' @param format Data format: "auto", "csv", "excel", "rds", "json", "parquet"
+#' @param preprocessing List of preprocessing options
+
+#' @title Import data from various sources for leakage analysis
+#'
+#' @param source Path to data file, data.frame, or other supported object.
+#' @param format Data format: "auto", "csv", "excel", "rds", "json", "parquet", "tsv".
+#'   If "auto", the format will be detected from the file extension.
+#' @param preprocessing List of preprocessing options to apply after import.
+#' @param encoding Character encoding for reading files. Default is "UTF-8".
+#' @param sheet Sheet name or index to read (for Excel files). Default is NULL.
+#' @param verbose Logical indicating whether to print progress messages. Default TRUE.
+#' @param ... Additional arguments passed to specific import functions.
+#'
+#' @return A standardized data.frame suitable for leakage analysis.
+#' @export
 leakr_import <- function(source, format = "auto", preprocessing = list(),
                          encoding = "UTF-8", sheet = NULL, verbose = TRUE, ...) {
-
   # Handle data.frame input directly
   if (is.data.frame(source)) {
     return(preprocess_imported_data(source, preprocessing, verbose))
@@ -79,24 +79,24 @@ leakr_import <- function(source, format = "auto", preprocessing = list(),
   return(data)
 }
 
-#' Minimal quick import for typical user workflows
+#' @title Fast import with default preprocessing
+#' @description Minimal quick import for typical user workflows. Uses leakr_import internally.
 #'
-#' Fast import with default preprocessing and minimal interaction.
-#' Uses leakr_import internally.
-#'
-#' @param source File path or data.frame
-#' @param ... Arguments passed to leakr_import for customisation
 #' @return Standardised data.frame
 #' @export
-#' @keywords internal
+#' @param source File path or data.frame
+#' @param ... TODO: Add description
 leakr_quick_import <- function(source, ...) {
   leakr_import(source, preprocessing = list(), verbose = FALSE, ...)
 }
 
-#' Detect file format from extension and content
+#' @title Detect file format from extension and content
+#'
+#' @return Character string indicating detected format
 #' @keywords internal
+#' @param file_path Path to the file
+#' @param verbose Whether to show detection messages
 detect_file_format <- function(file_path, verbose = TRUE) {
-
   # Get file extension
   ext <- tolower(tools::file_ext(file_path))
 
@@ -120,20 +120,17 @@ detect_file_format <- function(file_path, verbose = TRUE) {
   tryCatch({
     # Read first few lines to detect format
     first_lines <- readLines(file_path, n = 3, warn = FALSE)
-
     if (length(first_lines) > 0) {
       # Check for JSON
       if (grepl("^\\s*[\\{\\[]", first_lines[1])) {
         if (verbose) message("Detected JSON format from content")
         return("json")
       }
-
       # Check for CSV (comma-separated)
       if (grepl(",", first_lines[1])) {
         if (verbose) message("Detected CSV format from content")
         return("csv")
       }
-
       # Check for TSV (tab-separated)
       if (grepl("\\t", first_lines[1])) {
         if (verbose) message("Detected TSV format from content")
@@ -141,7 +138,7 @@ detect_file_format <- function(file_path, verbose = TRUE) {
       }
     }
   }, error = function(e) {
-    if (verbose) warning("Content detection failed: ", e$message)
+    # Silent error handling for content detection
   })
 
   # Default fallback with warning
@@ -151,10 +148,15 @@ detect_file_format <- function(file_path, verbose = TRUE) {
   return("csv")
 }
 
-#' Import CSV files with robust parsing and performance optimization
+#' @title Import CSV files with robust parsing
+#'
+#' @return data.frame
 #' @keywords internal
+#' @param file_path Path to CSV file
+#' @param encoding Character encoding
+#' @param verbose Whether to show messages
+#' @param ... TODO: Add description
 import_csv <- function(file_path, encoding, verbose, ...) {
-
   # Check if file is large and use streaming if necessary
   file_size <- file.info(file_path)$size
   if (!is.na(file_size) && file_size > 1e8) {
@@ -182,11 +184,9 @@ import_csv <- function(file_path, encoding, verbose, ...) {
     file = file_path,
     header = TRUE,
     stringsAsFactors = FALSE,
-    fileEncoding = encoding,
     na.strings = c("", "NA", "NULL", "#N/A", "N/A"),
     strip.white = TRUE
   )
-
   args <- modifyList(default_args, list(...))
   tryCatch({
     do.call(read.csv, args)
@@ -195,10 +195,15 @@ import_csv <- function(file_path, encoding, verbose, ...) {
   })
 }
 
-#' Import TSV files with robust parsing and performance optimization
+#' @title Import TSV files with robust parsing
+#'
+#' @return data.frame
 #' @keywords internal
+#' @param file_path Path to TSV file
+#' @param encoding Character encoding
+#' @param verbose Whether to show messages
+#' @param ... TODO: Add description
 import_tsv <- function(file_path, encoding, verbose, ...) {
-
   # Check if file is large and use streaming if necessary
   file_size <- file.info(file_path)$size
   if (!is.na(file_size) && file_size > 1e8) {
@@ -224,13 +229,11 @@ import_tsv <- function(file_path, encoding, verbose, ...) {
   default_args <- list(
     file = file_path,
     header = TRUE,
-    sep = "\t",
     stringsAsFactors = FALSE,
     fileEncoding = encoding,
     na.strings = c("", "NA", "NULL", "#N/A", "N/A"),
     strip.white = TRUE
   )
-
   args <- modifyList(default_args, list(...))
   tryCatch({
     do.call(read.delim, args)
@@ -239,10 +242,15 @@ import_tsv <- function(file_path, encoding, verbose, ...) {
   })
 }
 
-#' Import Excel files with enhanced sheet support
+#' @title Import Excel files with enhanced sheet support
+#'
+#' @return data.frame
 #' @keywords internal
+#' @param file_path Path to Excel file
+#' @param sheet Sheet name or number
+#' @param verbose Whether to show messages
+#' @param ... TODO: Add description
 import_excel <- function(file_path, sheet, verbose, ...) {
-
   # Check for required package
   if (!requireNamespace("readxl", quietly = TRUE)) {
     stop("The 'readxl' package is required for reading Excel files. Install it with: install.packages('readxl')")
@@ -263,8 +271,7 @@ import_excel <- function(file_path, sheet, verbose, ...) {
       # Validate sheet selection
       if (is.character(sheet) && !sheet %in% available_sheets) {
         stop("Sheet '", sheet, "' not found. Available sheets: ", paste(available_sheets, collapse = ", "))
-      }
-      if (is.numeric(sheet) && (sheet < 1 || sheet > length(available_sheets))) {
+      } else if (is.numeric(sheet) && (sheet < 1 || sheet > length(available_sheets))) {
         stop("Sheet number ", sheet, " out of range. Available: 1-", length(available_sheets))
       }
     }
@@ -274,16 +281,19 @@ import_excel <- function(file_path, sheet, verbose, ...) {
 
     # Return data as a standard data.frame
     as.data.frame(data)
-
   }, error = function(e) {
     stop("Failed to import Excel file: ", e$message)
   })
 }
 
-#' Import RDS files with validation
+#' @title Import RDS files with validation
+#'
+#' @return data.frame
 #' @keywords internal
+#' @param file_path Path to RDS file
+#' @param verbose Whether to show messages
+#' @param ... TODO: Add description
 import_rds <- function(file_path, verbose, ...) {
-
   tryCatch({
     # Read the RDS file
     data <- readRDS(file_path)
@@ -300,18 +310,22 @@ import_rds <- function(file_path, verbose, ...) {
         stop("RDS file does not contain tabular data that can be converted to a data.frame")
       }
     }
-
     return(data)
-
   }, error = function(e) {
     stop("Failed to import RDS file: ", e$message)
   })
 }
 
-#' Import JSON files with better structure handling
+#' @title Import JSON files with better structure handling
+#' @description Import and process JSON files, converting them into a standardized data.frame.
+#'
+#' @param file_path Path to the JSON file.
+#' @param verbose Logical flag indicating whether to show progress messages (default is FALSE).
+#' @param ... Additional arguments passed to `jsonlite::fromJSON()`.
+#'
+#' @return A data.frame with the content from the JSON file, flattened.
 #' @keywords internal
-import_json <- function(file_path, verbose, ...) {
-
+import_json <- function(file_path, verbose = FALSE, ...) {
   # Check if jsonlite is available
   if (!requireNamespace("jsonlite", quietly = TRUE)) {
     stop("The 'jsonlite' package is required for reading JSON files. Install it with: install.packages('jsonlite')")
@@ -321,11 +335,10 @@ import_json <- function(file_path, verbose, ...) {
     # Read and flatten the JSON file
     data <- jsonlite::fromJSON(file_path, flatten = TRUE, ...)
 
-    # Ensure data is convertible to a data.frame
+    # Handle different data structures
     if (!is.data.frame(data)) {
       if (is.list(data)) {
         lengths_vec <- lengths(data)
-
         # Check if all list elements have the same length
         if (length(unique(lengths_vec)) == 1) {
           if (verbose) message("Converting JSON list to data.frame")
@@ -337,15 +350,22 @@ import_json <- function(file_path, verbose, ...) {
         stop("JSON file does not contain tabular data")
       }
     }
-    return(data)}, error = function(e) {
+    return(data)
+  }, error = function(e) {
     stop("Failed to import JSON file: ", e$message)
   })
 }
 
-#' Import Parquet files
+#' @title Import Parquet files
+#' @description Import and process Parquet files into a standardized data.frame.
+#'
+#' @param file_path Path to the Parquet file.
+#' @param verbose Logical flag indicating whether to show progress messages (default is FALSE).
+#' @param ... Additional arguments passed to `arrow::read_parquet()`.
+#'
+#' @return A data.frame with the content from the Parquet file.
 #' @keywords internal
-import_parquet <- function(file_path, verbose, ...) {
-
+import_parquet <- function(file_path, verbose = FALSE, ...) {
   if (!requireNamespace("arrow", quietly = TRUE)) {
     stop("arrow package required for Parquet files. Install with: install.packages('arrow')")
   }
@@ -358,10 +378,17 @@ import_parquet <- function(file_path, verbose, ...) {
   })
 }
 
-#' Enhanced preprocessing with better performance and robustness
-#' @keywords internal
-preprocess_imported_data <- function(data, preprocessing, verbose) {
 
+#' @title Enhanced preprocessing with better performance and robustness
+#' @description A preprocessing function to handle common data issues, such as removing empty rows/columns, handling dates, and converting character columns to factors. This function improves data quality before further analysis.
+#'
+#' @param data Input data.frame to be preprocessed.
+#' @param preprocessing A list of preprocessing options, such as removing empty rows or handling dates.
+#' @param verbose Logical flag indicating whether to show progress messages (default is FALSE).
+#'
+#' @return A preprocessed data.frame.
+#' @keywords internal
+preprocess_imported_data <- function(data, preprocessing = list(), verbose = FALSE) {
   # Default preprocessing options
   default_preprocessing <- list(
     remove_empty_rows = TRUE,
@@ -431,7 +458,7 @@ preprocess_imported_data <- function(data, preprocessing, verbose) {
     provenance$handle_dates <- TRUE
   }
 
-  # Convert character to factor with level limits
+  # Convert character columns to factors if requested
   if (preprocessing$convert_character_to_factor) {
     char_cols <- vapply(data, is.character, logical(1))
     max_levels <- preprocessing$max_factor_levels
@@ -452,14 +479,17 @@ preprocess_imported_data <- function(data, preprocessing, verbose) {
     message("Data shape changed from ", paste(original_dims, collapse = " x "),
             " to ", paste(final_dims, collapse = " x "))
   }
+
   attr(data, "leakr_provenance") <- provenance
   return(data)
 }
 
-#' Enhanced column name cleaning with better robustness
+#' @title Enhanced column name cleaning with better robustness
+#'
+#' @return Cleaned column names
 #' @keywords internal
+#' @param names Character vector of column names
 clean_column_names <- function(names) {
-
   # Handle missing or NULL names
   if (is.null(names) || length(names) == 0) {
     return(character(0))
@@ -491,14 +521,16 @@ clean_column_names <- function(names) {
 
   # Ensure uniqueness using make.names
   names <- make.names(names, unique = TRUE)
-
   return(names)
 }
 
-#' Enhanced date detection handling multiple formats and data types
+#' @title Enhanced date detection handling multiple formats and data types
+#'
+#' @return data.frame with converted dates
 #' @keywords internal
+#' @param data Input data.frame
+#' @param verbose Whether to show messages
 detect_and_convert_dates_enhanced <- function(data, verbose) {
-
   converted_count <- 0
 
   for (col_name in names(data)) {
@@ -529,7 +561,6 @@ detect_and_convert_dates_enhanced <- function(data, verbose) {
         # Check both seconds and milliseconds timestamps
         if (all(non_na_vals >= min_unix & non_na_vals <= max_unix) ||
             all(non_na_vals >= min_unix * 1000 & non_na_vals <= max_unix * 1000)) {
-
           tryCatch({
             # Try as seconds first, then milliseconds
             if (all(non_na_vals < max_unix)) {
@@ -537,13 +568,13 @@ detect_and_convert_dates_enhanced <- function(data, verbose) {
             } else {
               converted_dates <- as.Date(as.POSIXct(col_data / 1000, origin = "1970-01-01"))
             }
-
             data[[col_name]] <- converted_dates
             converted_count <- converted_count + 1
             if (verbose) message("Converted '", col_name, "' from ", original_type, " to Date (Unix timestamp)")
             next
-          }, error = function(e) {})
+          }, error = function(e) {
             # Continue to text-based detection
+          })
         }
       }
     }
@@ -556,7 +587,6 @@ detect_and_convert_dates_enhanced <- function(data, verbose) {
     # Check if looks like dates (sample approach for performance)
     sample_size <- min(20, length(col_data[!is.na(col_data)]))
     sample_values <- col_data[!is.na(col_data)][1:sample_size]
-
     if (length(sample_values) == 0) {
       next
     }
@@ -577,11 +607,11 @@ detect_and_convert_dates_enhanced <- function(data, verbose) {
       pattern <- pattern_info$pattern
       pattern_name <- pattern_info$name
 
-      parsed_dates <- suppressWarnings(as.Date(sample_values, format = pattern))
+      # Test parsing on sample
+      parsed_dates <- as.Date(sample_values, format = pattern)
 
       # If at least 70% parse successfully, convert the column
       success_rate <- sum(!is.na(parsed_dates)) / length(sample_values)
-
       if (success_rate >= 0.7) {
         tryCatch({
           data[[col_name]] <- as.Date(col_data, format = pattern)
@@ -590,8 +620,9 @@ detect_and_convert_dates_enhanced <- function(data, verbose) {
             message("Converted '", col_name, "' to Date using ", pattern_name)
           }
           break
-        }, error = function(e) {})
+        }, error = function(e) {
           # Continue to next pattern
+        })
       }
     }
   }
@@ -599,42 +630,27 @@ detect_and_convert_dates_enhanced <- function(data, verbose) {
   if (verbose && converted_count > 0) {
     message("Successfully converted ", converted_count, " column(s) to Date format")
   }
-
   return(data)
 }
 
-#' Enhanced data validation with better error messages
+#' @title Enhanced data validation with better error messages
+#'
+#' @return TRUE (invisibly) if validation passes
 #' @keywords internal
+#' @param data Input data.frame
+#' @param source Source identifier for error messages
 validate_imported_data <- function(data, source) {
-
   # Check if data is empty
   if (nrow(data) == 0) {
     stop("Imported data has no rows: ", source)
   }
-
   if (ncol(data) == 0) {
     stop("Imported data has no columns: ", source)
   }
 
   # Check for reasonable dimensions
   if (nrow(data) > 1000000) {
-    warning("Large dataset imported (", format(nrow(data), big.mark = ","),
-            " rows). Consider sampling for analysis to improve performance.")
-  }
-
-  # Check column name issues
-  if (any(duplicated(names(data)))) {
-    warning("Duplicate column names detected and made unique.")
-    names(data) <- make.names(names(data), unique = TRUE)
-  }
-
-  # Check for high missing data rates
-  missing_rates <- vapply(data, function(x) sum(is.na(x)) / length(x), numeric(1))
-  high_missing <- missing_rates > 0.9
-
-  if (any(high_missing)) {
-    warning("Columns with >90% missing data: ",
-            paste(names(data)[high_missing], collapse = ", "))
+    warning("Large dataset imported (", nrow(data), " rows). Consider using sampling for initial analysis.")
   }
 
   # Check for problematic data types
@@ -647,12 +663,9 @@ validate_imported_data <- function(data, source) {
   return(invisible(TRUE))
 }
 
-#' Convert mlr3 Task objects to standard format
+#' @title Convert mlr3 Task objects to standard format
+#' @description Extract data from mlr3 Task objects for leakage analysis.
 #'
-#' Extract data from mlr3 Task objects for leakage analysis.
-#'
-#' @param task mlr3 Task object (TaskClassif, TaskRegr, etc.)
-#' @param include_target Whether to include target variable in output
 #'
 #' @return List with data, target, and metadata
 #' @export
@@ -664,9 +677,9 @@ validate_imported_data <- function(data, source) {
 #' leakr_data <- leakr_from_mlr3(task, include_target = TRUE)
 #' report <- leakr_audit(leakr_data$data, target = leakr_data$target)
 #' }
-#' @keywords internal
+#' @param task mlr3 Task object (TaskClassif, TaskRegr, etc.)
+#' @param include_target Whether to include target variable in output
 leakr_from_mlr3 <- function(task, include_target = TRUE) {
-
   if (!requireNamespace("mlr3", quietly = TRUE)) {
     stop("mlr3 package required. Install with: install.packages('mlr3')")
   }
@@ -675,17 +688,17 @@ leakr_from_mlr3 <- function(task, include_target = TRUE) {
     stop("Input must be an mlr3 Task object")
   }
 
-  # Extract data safely
   tryCatch({
+    # Extract data and target
     data <- task$data()
-    target_col <- task$target_names
+    target_name <- task$target_names
 
-    # Prepare output
     result <- list(
-      data = if (include_target) data else data[, !names(data) %in% target_col, drop = FALSE],
-      target = target_col,
-      task_type = class(task)[1],
+      data = if (include_target) data else data[, !names(data) %in% target_name, drop = FALSE],
+      target = if (include_target && length(target_name) > 0) data[[target_name[1]]] else NULL,
+      target_name = if (length(target_name) > 0) target_name[1] else NULL,
       feature_names = task$feature_names,
+      task_type = class(task)[1],
       n_rows = task$nrow,
       n_features = length(task$feature_names)
     )
@@ -697,13 +710,8 @@ leakr_from_mlr3 <- function(task, include_target = TRUE) {
   })
 }
 
-#' Convert caret training objects to standard format
-#'
-#' Extract data from caret train objects for leakage analysis.
-#'
-#' @param train_obj caret train object
-#' @param original_data Original training data (if available)
-#' @param target_name Custom name for target variable (default: "target")
+#' @title Convert caret training objects to standard format
+#' @description Extract data from caret train objects for leakage analysis.
 #'
 #' @return List with data and metadata
 #' @export
@@ -714,9 +722,10 @@ leakr_from_mlr3 <- function(task, include_target = TRUE) {
 #' model <- train(Species ~ ., data = iris, method = "rf")
 #' leakr_data <- leakr_from_caret(model, original_data = iris, target_name = "Species")
 #' }
-#' @keywords internal
+#' @param train_obj caret train object
+#' @param original_data Original training data (if available)
+#' @param target_name Custom name for target variable (default: "target")
 leakr_from_caret <- function(train_obj, original_data = NULL, target_name = "target") {
-
   if (!requireNamespace("caret", quietly = TRUE)) {
     stop("caret package required. Install with: install.packages('caret')")
   }
@@ -727,22 +736,17 @@ leakr_from_caret <- function(train_obj, original_data = NULL, target_name = "tar
 
   # Extract available information
   result <- list(
-    model_info = train_obj$modelInfo,
+    data = original_data,
+    target_name = target_name,
     method = train_obj$method,
-    n_features = if (!is.null(train_obj$trainingData)) ncol(train_obj$trainingData) - 1 else NA,
-    performance = train_obj$results
+    model_info = train_obj$modelInfo,
+    final_model = train_obj$finalModel
   )
 
-  # Include original data if provided
-  if (!is.null(original_data)) {
-    if (!is.data.frame(original_data)) {
-      stop("original_data must be a data.frame")
-    }
-    result$data <- original_data
-  } else if (!is.null(train_obj$trainingData)) {
-    # Reconstruct from training data
+  # If original data not provided, try to extract from training data
+  if (is.null(result$data) && !is.null(train_obj$trainingData)) {
     training_data <- train_obj$trainingData
-    # Rename .outcome to specified target name
+    # Remove .outcome column if it exists (caret internal)
     if (".outcome" %in% names(training_data)) {
       names(training_data)[names(training_data) == ".outcome"] <- target_name
     }
@@ -753,12 +757,8 @@ leakr_from_caret <- function(train_obj, original_data = NULL, target_name = "tar
   return(result)
 }
 
-#' Convert tidymodels workflow to standard format
-#'
-#' Extract data from tidymodels workflows for leakage analysis.
-#'
-#' @param workflow tidymodels workflow object
-#' @param data Original training data
+#' @title Convert tidymodels workflow to standard format
+#' @description Extract data from tidymodels workflows for leakage analysis.
 #'
 #' @return List with data and metadata
 #' @export
@@ -771,9 +771,9 @@ leakr_from_caret <- function(train_obj, original_data = NULL, target_name = "tar
 #' workflow <- workflow() %>% add_recipe(recipe_spec) %>% add_model(model_spec)
 #' leakr_data <- leakr_from_tidymodels(workflow, iris)
 #' }
-#' @keywords internal
+#' @param workflow tidymodels workflow object
+#' @param data Original training data
 leakr_from_tidymodels <- function(workflow, data) {
-
   if (!requireNamespace("workflows", quietly = TRUE)) {
     stop("workflows package (tidymodels) required. Install with: install.packages('tidymodels')")
   }
@@ -797,7 +797,7 @@ leakr_from_tidymodels <- function(workflow, data) {
 
   # Check components safely
   tryCatch({
-    result$has_preprocessor <- workflows::has_preprocessor(workflow)
+    result$has_preprocessor <- !is.null(workflows::pull_workflow_preprocessor(workflow))
     if (result$has_preprocessor) {
       preprocessor <- workflows::pull_workflow_preprocessor(workflow)
       if (!is.null(preprocessor)) {
@@ -809,7 +809,7 @@ leakr_from_tidymodels <- function(workflow, data) {
   })
 
   tryCatch({
-    result$has_spec <- workflows::has_spec(workflow)
+    result$has_spec <- !is.null(workflows::pull_workflow_spec(workflow))
     if (result$has_spec) {
       spec <- workflows::pull_workflow_spec(workflow)
       if (!is.null(spec)) {
@@ -827,14 +827,20 @@ leakr_from_tidymodels <- function(workflow, data) {
   return(result)
 }
 
-#' Export data with consistent messaging
+#' @title Export data with consistent messaging
+#'
+#' @return Path to exported file
 #' @keywords internal
+#' @param data Data.frame to export
+#' @param file_path Output file path
+#' @param format Output format
+#' @param verbose Whether to show messages
+#' @param ... TODO: Add description
 export_data_internal <- function(data, file_path, format, verbose, ...) {
-
-  # Create directory if needed
-  dir_path <- dirname(file_path)
-  if (!dir.exists(dir_path)) {
-    dir.create(dir_path, recursive = TRUE)
+  # Ensure output directory exists
+  output_dir <- dirname(file_path)
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
   }
 
   # Export based on format
@@ -869,36 +875,29 @@ export_data_internal <- function(data, file_path, format, verbose, ...) {
   if (verbose) {
     message("Data exported to: ", file_path)
   }
-
   return(file_path)
 }
 
-#' Export data in various formats
+#' @title Export data in various formats
+#' @description Save processed data to different file formats with consistent behaviour.
 #'
-#' Save processed data to different file formats with consistent behaviour.
-#'
+#' @return Path to exported file (invisibly)
+#' @export
 #' @param data Data.frame to export
 #' @param file_path Output file path
 #' @param format Output format: "csv", "excel", "rds", "json", "parquet"
 #' @param verbose Whether to show export messages
-#' @param ... Additional arguments for format-specific writers
-#'
-#' @return Path to exported file (invisibly)
-#' @export
-#' @keywords internal
+#' @param ... TODO: Add description
 leakr_export_data <- function(data, file_path, format = "csv", verbose = TRUE, ...) {
-
   if (!is.data.frame(data)) {
     stop("data must be a data.frame")
   }
-
   result <- export_data_internal(data, file_path, format, verbose, ...)
   return(invisible(result))
 }
 
-#' Create data snapshots with improved metadata handling
-#'
-#' Save data and metadata for reproducible leakage analysis with optimised performance.
+#' @title Create data snapshots with improved metadata handling
+#' @description Save data and metadata for reproducible leakage analysis with optimised performance.
 #'
 #' @param data Data.frame to snapshot
 #' @param output_dir Directory for snapshot files
@@ -908,11 +907,9 @@ leakr_export_data <- function(data, file_path, format = "csv", verbose = TRUE, .
 #'
 #' @return Path to snapshot directory
 #' @export
-#' @keywords internal
 leakr_create_snapshot <- function(data, output_dir = "leakr_snapshots",
                                   snapshot_name = NULL, metadata = list(),
                                   sample_for_hash = TRUE) {
-
   # Ensure 'data' is a data.frame
   if (!is.data.frame(data)) stop("data must be a data.frame")
 
@@ -941,10 +938,10 @@ leakr_create_snapshot <- function(data, output_dir = "leakr_snapshots",
     digest::digest(data)
   }
 
-  # Create metadata with necessary information
+  # Comprehensive metadata
   full_metadata <- list(
-    created_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC"),
-    leakr_version = as.character(utils::packageVersion("leakR")),
+    created_at = Sys.time(),
+    leakr_version = utils::packageVersion("leakR") %||% "unknown",
     r_version = R.version.string,
     data_shape = dim(data),
     column_names = names(data),
@@ -963,7 +960,7 @@ leakr_create_snapshot <- function(data, output_dir = "leakr_snapshots",
   readme_content <- paste0(
     "# Data Snapshot: ", snapshot_name, "\n\n",
     "**Created:** ", full_metadata$created_at, "\n",
-    "**leakR Version:** ", full_metadata$leakr_version, "\n",
+    "**leakr Version:** ", full_metadata$leakr_version, "\n",
     "**R Version:** ", full_metadata$r_version, "\n\n",
     "## Files:\n",
     "- `data.csv`: Data in CSV format\n",
@@ -971,7 +968,7 @@ leakr_create_snapshot <- function(data, output_dir = "leakr_snapshots",
     "- `metadata.json`: Snapshot metadata and provenance\n",
     "- `README.md`: This documentation file\n\n",
     "## Data Summary:\n",
-    "- **Dimensions:** ", paste(full_metadata$data_shape, collapse = " × "), " (rows × columns)\n",
+    "- **Dimensions:** ", paste(full_metadata$data_shape, collapse = " x "), " (rows x columns)\n",
     "- **Hash:** ", full_metadata$data_hash, "\n",
     "- **Hash Method:** ", full_metadata$hash_method, "\n\n",
     "## Column Information:\n",
@@ -1000,32 +997,28 @@ leakr_create_snapshot <- function(data, output_dir = "leakr_snapshots",
 
   # Display messages
   message("Snapshot created: ", snapshot_dir)
-  message("Data shape: ", paste(full_metadata$data_shape, collapse = " × "))
+  message("Data shape: ", paste(full_metadata$data_shape, collapse = " x "))
   message("Hash: ", full_metadata$data_hash)
 
   # Return snapshot directory
   invisible(snapshot_dir)
 }
 
-#' Load data snapshot with enhanced validation
-#'
-#' Restore data from a previously created snapshot with integrity checking.
-#'
-#' @param snapshot_path Path to snapshot directory
-#' @param format Format to load: "rds" (recommended), "csv"
-#' @param verify_integrity Whether to verify data integrity using hash
+#' @title Load data snapshot with enhanced validation
+#' @description Restore data from a previously created snapshot with integrity checking.
 #'
 #' @return Data.frame from snapshot
 #' @export
-#' @keywords internal
+#' @param snapshot_path Path to snapshot directory
+#' @param format Format to load: "rds" (recommended), "csv"
+#' @param verify_integrity Whether to verify data integrity using hash
 leakr_load_snapshot <- function(snapshot_path, format = "rds", verify_integrity = TRUE) {
-
-  # Check if the snapshot directory exists
+  # Check if snapshot directory exists
   if (!dir.exists(snapshot_path)) {
     stop("Snapshot directory not found: ", snapshot_path)
   }
 
-  # Determine the appropriate data file based on the format
+  # Determine data file path based on format
   data_file <- switch(format,
                       "rds" = file.path(snapshot_path, "data.rds"),
                       "csv" = file.path(snapshot_path, "data.csv"),
@@ -1048,11 +1041,10 @@ leakr_load_snapshot <- function(snapshot_path, format = "rds", verify_integrity 
   if (file.exists(metadata_file)) {
     tryCatch({
       metadata <- jsonlite::fromJSON(metadata_file)
-
       # Log metadata information
       message("Loaded snapshot from: ", metadata$created_at)
-      message("leakR version: ", metadata$leakr_version)
-      message("Data shape: ", paste(metadata$data_shape, collapse = " × "))
+      message("leakr version: ", metadata$leakr_version)
+      message("Data shape: ", paste(metadata$data_shape, collapse = " x "))
 
       # Verify data integrity if requested
       if (verify_integrity && !is.null(metadata$data_hash)) {
@@ -1070,7 +1062,7 @@ leakr_load_snapshot <- function(snapshot_path, format = "rds", verify_integrity 
           warning(sprintf("Data hash mismatch. Data may be corrupted or modified.\nExpected: %s\nActual: %s",
                           metadata$data_hash, current_hash))
         } else {
-          message("✓ Data integrity verified")
+          message("[OK] Data integrity verified")
         }
       }
 
@@ -1085,19 +1077,14 @@ leakr_load_snapshot <- function(snapshot_path, format = "rds", verify_integrity 
   }
 }
 
-
-#' List available snapshots with enhanced information
-#'
-#' Display comprehensive information about available data snapshots.
-#'
-#' @param snapshots_dir Directory containing snapshots
-#' @param include_metadata Whether to load detailed metadata for each snapshot
+#' @title List available snapshots with enhanced information
+#' @description Display comprehensive information about available data snapshots.
 #'
 #' @return Data.frame with snapshot information
 #' @export
-#' @keywords internal
+#' @param snapshots_dir Directory containing snapshots
+#' @param include_metadata Whether to load detailed metadata for each snapshot
 leakr_list_snapshots <- function(snapshots_dir = "leakr_snapshots", include_metadata = TRUE) {
-
   # Check if the snapshots directory exists
   if (!dir.exists(snapshots_dir)) {
     message("No snapshots directory found: ", snapshots_dir)
@@ -1187,7 +1174,10 @@ leakr_list_snapshots <- function(snapshots_dir = "leakr_snapshots", include_meta
   return(snapshot_info)
 }
 
-# Helper function to return an empty snapshot info dataframe
+#' @title Helper function to return an empty snapshot info dataframe
+#'
+#' @return Empty data.frame with correct structure
+#' @keywords internal
 empty_snapshot_info <- function() {
   return(data.frame(
     name = character(0),
@@ -1201,18 +1191,14 @@ empty_snapshot_info <- function() {
   ))
 }
 
-# Null-coalescing operator for internal use
-# @keywords internal
-`%||%` <- function(x, y) {
-  if (is.null(x)) y else x
-}
-
-#' Null-coalescing operator for clean default value handling
+#' @title Null-coalescing operator for clean default value handling
+#' @name grapes-or-or-grapes
+#' @rdname grapes-or-or-grapes
 #'
 #' @param x First value to check
-#' @param y Default value if x is NULL
+#' @param y Fallback value if x is NULL
 #' @return x if not NULL, otherwise y
-#' @keywords internal
+#' @export
 `%||%` <- function(x, y) {
   if (is.null(x)) y else x
 }
